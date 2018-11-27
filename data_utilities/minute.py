@@ -19,14 +19,6 @@ volume INTEGER,
 symbol TEXT);
 """
 
-select_basket_script = """
-SELECT * FROM bars
-WHERE date_time >= ?
-AND date_time < ?
-AND symbol IN ({})
-ORDER BY date_time
-"""
-
 insert_row_query = """
 INSERT INTO bars
 (date_time, open_price, high_price, low_price, close_price, volume, symbol)
@@ -38,17 +30,38 @@ count_query = """
 SELECT COUNT(*) FROM bars
 """
 
+get_symbols_for_date_query = """
+SELECT DISTINCT symbol FROM bars WHERE DATE(date_time) = ?
+"""
+
+select_all_query = """
+SELECT * FROM bars
+"""
+
+select_all_for_date_query = """
+SELECT * FROM bars WHERE DATE(date_time) = ?
+"""
+
+select_basket_for_date_query = """
+SELECT * FROM bars
+WHERE DATE(date_time) = ?
+AND symbol IN ({})
+ORDER BY date_time
+"""
+
 active_connection = None
 active_connection_path = ''
 
 
+# used to make ?,?,...,? string for the number of symbols
+# the result is inserted into query
 def construct_select_basket_query(symbols):
     qms = ','.join('?' * len(symbols))
-    return select_basket_script.format(qms)
+    return select_basket_for_date_query.format(qms)
 
 
+# path depends on date, each month year has its own db
 def db_path(date):
-    # path depends on date, each month year has its own db
     if isinstance(date, str):
         date = dates.convert_dashed_string_to_date(date)
     return '{}/db/stocks/minute/{}/minute{}{}{}.db'.format(
@@ -56,6 +69,7 @@ def db_path(date):
         '0' if date.month < 10 else '', date.month)
 
 
+# connects to proper year/month db
 def switch_active_connection(date):
     global active_connection
     global active_connection_path
@@ -68,89 +82,24 @@ def switch_active_connection(date):
         active_connection.execute(create_eod_table_script)
 
 
-def data_available(symbol, date):
-    pass
-
-
-def insert_kb_rows_in_db(rows):
-    pass
-
-
-def convert_kb_rows_to_df(symbol, rows):
-    s = rows
-    headers = ['date', 'time', 'open', 'high', 'low', 'close', 'volume']
-    dtypes = {'date': 'str', 'time': 'str', 'open': 'float', 'high': 'float', 'low': 'float', 'close': 'float',
-              'volume': 'object'}
-    parse_dates = [['date', 'time']]
-    df = pd.read_csv(io.StringIO(s.decode('utf-8')), names=headers, dtype=dtypes, parse_dates=parse_dates,
-                     index_col='date_time')
-    df['symbol'] = symbol
-    return df
-    # TODO: who will call the df maker?
-
-
+# converts query result rows to a dataframe with datetime conversion
 def convert_db_rows_to_df(rows):
-    # TODO implement
-    print rows
-    print type(rows)
-    # rows is a list of db rows
-
-    # headers = ['date', 'time', 'open', 'high', 'low', 'close', 'volume', 'symbol']
-    # dtypes = {'date': 'str', 'time': 'str', 'open': 'float', 'high': 'float', 'low': 'float', 'close': 'float',
-    #           'volume': 'object', 'symbol': object}
-    # parse_dates = [['date', 'time']]
-    # df = pd.DataFrame(io.StringIO(rows.decode('utf-8')), names=headers, dtype=dtypes, parse_dates=parse_dates,
-    #                  index_col='date_time')
-    return None
+    df = pd.DataFrame(rows)
+    df.columns = ['date_time', 'open', 'high', 'low', 'close', 'volume', 'symbol']
+    df['date_time'] = pd.to_datetime(df['date_time'])
+    df.set_index('date_time', inplace=True)
+    return df
 
 
-
-
-
-def query_db_for_single_day(symbol, date):
-    pass
-
-
-def get_bars_as_df(symbol, date):
-    pass
-
-
-# TODO check if inmem db exists
-#   db exists if the file is there
-#   program should connect to all its dbs?
-# TODO create an inmem minute db
-#   creating the table creates the db
-# TODO request a day of data from db
-
-
-"""
-Workflow: 
-
-* user requests a basket of rows for a particular day
-* check to see if all are available in db
-* request the ones that are not available an insert in db
-* query all the symbols in the basket
-"""
-def request_basket_data(symbols, date):
-    query = construct_select_basket_query(symbols)
-    print query
-    next_date = date.date() + dt.timedelta(days=1)
-    query_parameters = (str(date.date()), str(next_date)) + tuple(symbols)
-    print query_parameters
+# this is to check which symbols have data
+def get_symbols_for_date(date):
     switch_active_connection(date)
     cursor = active_connection.cursor()
-    res = cursor.execute(query, query_parameters)
-    return convert_db_rows_to_df(res.fetchall())
-
-
-# print request_basket_data(['AAPL', 'GE', 'IBM', 'QQQ'], dt.datetime(2018,1,2))
-
-
-
-def kibot_request_for_single_day(symbol, date):
-    kb.log_on()
-    response = kb.request_history(symbol, 1, None, date, date)
-    return response.text
+    res = cursor.execute(get_symbols_for_date_query, (str(date.date()),))
+    symbols = res.fetchall()
+    # symbols is a list of tuples
+    # convert to list:
+    return [symbol[0] for symbol in symbols]
 
 
 # response must be unprocessed
@@ -160,17 +109,12 @@ def insert_kb_response_into_database(response_text, symbol):
     cursor = active_connection.cursor()
     for row in rows[:-1]:
         tokens = row.split(',')
-        date_time = '{} {}'.format(
-            dates.convert_slashed_string_to_date(tokens[0]),
-            tokens[1])
-        cursor.execute(insert_row_query, (date_time,
-                                         tokens[2],
-                                         tokens[3],
-                                         tokens[4],
-                                         tokens[5],
-                                         tokens[6],
-                                         symbol
-                                         ))
+        if len(tokens) > 1:
+            date_time = '{} {}'.format(
+                dates.convert_slashed_string_to_date(tokens[0]),
+                tokens[1])
+            cursor.execute(insert_row_query, (date_time, tokens[2], tokens[3], tokens[4],
+                                              tokens[5], tokens[6], symbol))
     active_connection.commit()
 
 
@@ -178,22 +122,39 @@ def get_number_of_rows():
     r = active_connection.cursor().execute(count_query)
     return r.fetchone()[0]
 
-#r = kibot_request_for_single_day("MSFT", dt.datetime(2018,1,2))
-switch_active_connection(dt.datetime(2018,1,2))
-#insert_kb_response_into_database(r, 'MSFT')
-print request_basket_data(['AAPL', 'MSFT'], dt.datetime(2018,1,2))
 
-"""TODO
-# TODO 
-so you have AAPL and MSFT data for this one day 
-# TODO test the select basket with AAPL and MSFT
-now you need to request AAPL, MSFT, GE and BAC
-once you get the results you should check symbols and get notified that GE and BAC are missing
-"""
+def select_all():
+    r = active_connection.cursor().execute(select_all_query)
+    return r.fetchall()
 
-"""
-why should you convert date time 
-it can be compared as string comparison?
-get rid of the colon 
-if need be it can be made an integer
-"""
+
+def select_all_for_date(date):
+    r = active_connection.cursor().execute(select_all_for_date_query, (str(date.date()),))
+    return r.fetchall()
+
+
+def select_basket_for_date(basket, date):
+    if not isinstance(basket, list):
+        raise ValueError('Basket must be a list')
+    query = construct_select_basket_query(basket)
+    query_parameters = (str(date.date()),) + tuple(basket)
+    switch_active_connection(date)
+    cursor = active_connection.cursor()
+    res = cursor.execute(query, query_parameters)
+    return res.fetchall()
+
+
+# this is the main usecase
+def request_basket_data(basket, date):
+    switch_active_connection(date)
+    available_symbols = get_symbols_for_date(date)
+    missing_symbols = list(set(basket) - set(available_symbols))
+    if len(missing_symbols) > 0:
+        for symbol in missing_symbols:
+            print 'requesting', symbol
+            response = kb.request_for_single_day(symbol, date)
+            insert_kb_response_into_database(response, symbol)
+    rows = select_basket_for_date(basket, date)
+    return convert_db_rows_to_df(rows)
+
+# print request_basket_data(['AAPL', 'MSFT', 'C'], dt.datetime(2018,1,2))

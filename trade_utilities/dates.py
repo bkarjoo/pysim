@@ -82,7 +82,11 @@ def convert_dashed_string_to_date(date_str):
 def convert_slashed_string_to_date(date_str):
     try:
         toks = date_str.split('/')
-        return '{}-{}-{}'.format(toks[2], toks[1], toks[0])
+        return '{}-{}{}-{}{}'.format(toks[2],
+                                 '0' if len(toks[0]) < 2 else '',
+                                 toks[0],
+                                 '0' if len(toks[0]) < 2 else '',
+                                 toks[1])
     except:
         return None
 

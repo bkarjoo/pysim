@@ -183,6 +183,7 @@ def request_minute_data_for_one_day_from_month_pickle(symbol, date):
 
 
 def request_minute_datas_for_one_day(symbols, date):
+    # TODO delete this function, no longer used
     # get the data
     print 'requesting data for {} symbols on {}'.format(len(symbols), str(date))
     # dfs = []
@@ -276,3 +277,9 @@ def request_daily_data_as_list_of_rows(symbol, interval='daily', period=None, st
     s = r.content
     toks = s.split('\r\n')
     return toks
+
+
+def request_for_single_day(symbol, date):
+    log_on()
+    response = request_history(symbol, 1, None, date, date)
+    return response.text

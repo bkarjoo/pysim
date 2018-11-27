@@ -6,6 +6,7 @@ import copy
 import numpy as np
 import pickle
 import time
+import data_utilities.minute as intraday
 
 
 # TODO move this to time utilities
@@ -72,7 +73,8 @@ while date_i <= end_dt:
     # -------------------------------------------------------------------
 
     if len(data_req_list) > 0:
-        dfc = request_minute_datas_for_one_day(data_req_list, date_i)
+        # TODO run this
+        dfc = intraday.request_basket_data(data_req_list, date_i)
     else:
         dfc = pd.DataFrame()
 
