@@ -5,6 +5,7 @@ from trades import Trades
 from orders import Orders
 from daily_return import DailyReturn
 from data_utilities import eod
+import datetime
 
 
 open_orders = Orders()
@@ -45,3 +46,5 @@ def adv(symbol, number_of_days, request_date):
 def adr(symbol, number_of_days, request_date):
     return eod.average_daily_range(symbol, number_of_days, request_date)
 
+
+print adr('AAPL', 90, datetime.datetime(2018, 1, 2))

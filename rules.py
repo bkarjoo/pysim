@@ -84,7 +84,17 @@ def basket(dt = None):
     global potential_longs
     global potential_shorts
     potential_longs = list(set(z_score_greater_than_1) - set(earnings_symbols))
+    filtered = []
+    for symbol in potential_longs:
+        print 'get adr for', symbol
+        if adr(symbol, 20, dt) > 1: filtered.append(symbol)
+    potential_longs = filtered[:]
     potential_shorts = list(set(z_score_less_than_neg1) - set(earnings_symbols))
+    filtered = []
+    for symbol in potential_shorts:
+        print 'get adr for', symbol
+        if adr(symbol, 20, dt) > 1: filtered.append(symbol)
+        potential_shorts = filtered[:]
     return potential_longs + potential_shorts
 
 

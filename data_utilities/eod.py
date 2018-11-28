@@ -165,19 +165,25 @@ def fill_missing_data(symbol, number_of_days, request_date):
     last_available_date = get_last_date(symbol)
     # fill missing data if any:
     if first_available_date is None:
-        start_date = first_request_date
-        end_date = request_date
+        #start_date = first_request_date
+        start_date = datetime.datetime(2014, 1, 1)
+        # end_date = request_date
+        end_date = datetime.datetime.now() - datetime.timedelta(days=1)
         rows = kb_eod_request(symbol, start_date, end_date)
         insert_rows(symbol, rows)
     else:
         if first_request_date < first_available_date:
-            start_date = first_request_date
-            end_date = dates.add_trading_days(first_available_date, -1)
+            #start_date = first_request_date
+            start_date = datetime.datetime(2014, 1, 1)
+            #end_date = dates.add_trading_days(first_available_date, -1)
+            end_date = datetime.datetime.now() - datetime.timedelta(days=1)
             rows = kb_eod_request(symbol, str(start_date), str(end_date))
             insert_rows(symbol, rows)
         if request_date > last_available_date:
-            start_date = dates.add_trading_days(last_available_date, 1)
-            end_date = request_date
+            #start_date = dates.add_trading_days(last_available_date, 1)
+            start_date = datetime.datetime(2014, 1, 1)
+            #end_date = request_date
+            end_date = datetime.datetime.now() - datetime.timedelta(days=1)
             rows = kb_eod_request(symbol, start_date, end_date)
             insert_rows(symbol, rows)
 
@@ -215,9 +221,13 @@ def request_eod_data(symbol, number_of_days, request_date):
 
 
 def average_daily_range(symbol, look_back, date):
-    df = get_eod_bars(symbol, look_back, date)
-    df['range'] = df['high'] - df['low']
-    return df['range'].mean()
+    try:
+        df = get_eod_bars(symbol, look_back, date)
+        df['range'] = df['high'] - df['low']
+        return df['range'].mean()
+    except:
+        print 'data not available for ', symbol, look_back, date
+        return 0
 
 
 def average_daily_volume(symbol, look_back, date):
