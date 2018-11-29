@@ -14,8 +14,10 @@ def record_fill(o, row):
         fill_price = float(row['open'])
     else:
         if o.qty > 0:
+
             fill_price = min(o.price, row['open'])
         elif o.qty < 0:
+
             fill_price = max(o.price, row['open'])
 
     day_return.add_transaction(o.qty, fill_price)
@@ -25,23 +27,26 @@ def record_fill(o, row):
 
 
 def is_fill(o, row):
-
-    if o.qty == 0:
-        raise ValueError("Order cannot have 0 as its quantity.")
     if o.qty > 0:
         if o.price == 0:
+
             return True
         elif row['low'] < o.price:
+
             return True
         else:
             return False
     elif o.qty < 0:
         if o.price == 0:
+
             return True
         elif row['high'] > o.price:
+
             return True
         else:
             return False
+    else:
+        raise ValueError("Order cannot have 0 as its quantity.")
 
 
 def check_fills(row):

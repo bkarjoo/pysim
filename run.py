@@ -64,7 +64,10 @@ while is_weekend(date_i) or date_i in us_holidays:
 
 while date_i <= end_dt:
     day_return.reset(previous_date, date_i, trades.get_open_position_list())
+    print 'building basket'
+    basket_build_start = time.time()
     symbols = rules.basket(date_i)
+    print 'basket completed in ', time.time() - basket_build_start
     position_list = trades.get_open_position_symbol_list()
     data_req_list = symbols + list(set(position_list) - set(symbols))
 

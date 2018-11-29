@@ -281,5 +281,6 @@ def request_daily_data_as_list_of_rows(symbol, interval='daily', period=None, st
 
 def request_for_single_day(symbol, date):
     log_on()
-    response = request_history(symbol, 1, None, date, date)
+    response = request_history(symbol, 1, None, date, date, unadjusted=1)
     return response.text
+

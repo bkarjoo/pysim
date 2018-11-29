@@ -10,7 +10,6 @@ strategy_name = 'twitter sentiment'
 commission_per_share = 0.007
 start_date = '2017-07-13'
 end_date = '2018-06-13'
-#end_date = '2017-08-13'
 previous_date = datetime.datetime(2017, 7, 12)
 todays_date = datetime.datetime(2017, 7, 13)
 break_out_of_loop = False # set to true if no longer positions are possible
@@ -86,13 +85,11 @@ def basket(dt = None):
     potential_longs = list(set(z_score_greater_than_1) - set(earnings_symbols))
     filtered = []
     for symbol in potential_longs:
-        print 'get adr for', symbol
         if adr(symbol, 20, dt) > 1: filtered.append(symbol)
     potential_longs = filtered[:]
     potential_shorts = list(set(z_score_less_than_neg1) - set(earnings_symbols))
     filtered = []
     for symbol in potential_shorts:
-        print 'get adr for', symbol
         if adr(symbol, 20, dt) > 1: filtered.append(symbol)
         potential_shorts = filtered[:]
     return potential_longs + potential_shorts
@@ -182,7 +179,7 @@ def on_new_minute(date_time):
                     eod = bloomberg_eod[symbol]
                     open_price = eod[todays_date.date():todays_date.date()]['Open'][0]
                     if math.isnan(open_price): continue
-                    done_away(round(10000 / open_price, 0), symbol, open_price)
+                    done_away(round(-10000 / open_price, 0), symbol, open_price)
                 except:
                     pass
 
@@ -202,9 +199,11 @@ def on_new_bar(date_time, symbol, open_price, high_price, low_price, close_price
             trade = trades.get_open_trade(symbol)
             ep = trade.average_entry_price()
             if trade.side == 'Long':
-                sell(trade.position() * -1, symbol, ep * 1.01)
+
+                sell(abs(trade.position()), symbol, ep * 1.01)
             elif trade.side == 'Short':
-                buy(trade.position() * -1, symbol, ep * .99)
+
+                buy(abs(trade.position()), symbol, ep * .99)
 
 
 def on_day_end():

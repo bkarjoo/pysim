@@ -134,7 +134,7 @@ def kb_eod_request(symbol, start_date, end_date):
     kb.log_on()
     rows = kb.request_daily_data_as_list_of_rows(
         symbol, start_date=start_date,
-        end_date=end_date)
+        end_date=end_date, unadjusted=1)
     kb.log_out()
     return rows
 
