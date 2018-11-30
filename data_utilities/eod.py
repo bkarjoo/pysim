@@ -18,12 +18,28 @@ volume INTEGER,
 symbol TEXT);
 """
 
+create_stat_table_script = """
+CREATE TABLE IF NOT EXISTS stats
+(bar_date TEXT,
+symbol TEXT, 
+look_back INTEGER, 
+adv REAL,
+adr REAL);
+"""
+
 insert_eod_row_script = """
 INSERT INTO eod  
 (bar_date, open_price, high_price, low_price, close_price, 
 volume, symbol)
 VALUES
 (?, ?, ?, ?, ?, ?, ?);
+"""
+
+insert_stat_script = """
+INSERT INTO stats
+(bar_date, symbol, look_back, adv, adr)
+VALUES
+(?,?,?,?,?);
 """
 
 select_all_script = """
@@ -35,6 +51,13 @@ SELECT * FROM eod
 WHERE symbol = ?
 AND bar_date >= ?
 AND bar_date <= ?
+"""
+
+select_stats_script = """
+SELECT * FROM stats
+WHERE symbol = ?
+AND bar_date = ?
+AND look_back = ?
 """
 
 select_days_back_script = """
@@ -58,9 +81,17 @@ delete_script = """
 DELETE FROM eod WHERE symbol = ?
 """
 
+delete_all_stats = """
+DELETE FROM stats
+"""
+
 
 def get_stocks_eod_database_path():
     return '{}/db/stocks/daily/eod.db'.format(config.data_root)
+
+
+def get_stats_eod_database_path():
+    return '{}/db/stocks/daily/stats.db'.format(config.data_root)
 
 
 def connect_to_eod():
@@ -69,7 +100,14 @@ def connect_to_eod():
     return conn
 
 
+def connect_to_stats():
+    conn = sql.connect(get_stats_eod_database_path())
+    conn.execute(create_stat_table_script)
+    return conn
+
+
 eod_db_connection = connect_to_eod()
+stats_db_connection = connect_to_stats()
 
 
 def convert_str_date_format(dd):
@@ -128,6 +166,12 @@ def insert_rows(symbol, rows):
                      symbol))
 
     eod_db_connection.commit()
+
+
+def insert_stats(bar_date, symbol, look_back, adv, adr):
+    cur = stats_db_connection.cursor()
+    cur.execute(insert_stat_script, (str(bar_date.date()), symbol, look_back, adv, adr))
+    stats_db_connection.commit()
 
 
 def kb_eod_request(symbol, start_date, end_date):
@@ -220,6 +264,12 @@ def request_eod_data(symbol, number_of_days, request_date):
     return select_eod_rows(symbol, first_request_date, last_request_date)
 
 
+def get_stats(symbol, date, lookback):
+    cur = stats_db_connection.cursor()
+    response = cur.execute(select_stats_script, (symbol, str(date.date()), lookback))
+    return response.fetchall()
+
+
 def average_daily_range(symbol, look_back, date):
     try:
         df = get_eod_bars(symbol, look_back, date)
@@ -259,3 +309,11 @@ def get_eod_bars(symbol, days_back, request_date):
             return convert_rows_to_df(rows)
         else:
             raise LookupError('Data not available.')
+
+
+# print get_eod_bars('TJX', 1, datetime.datetime(2017,7,17))
+# insert_stats(datetime.datetime(2018,1,1), 'ZYZZ', 10, 2.2, 1.3)
+# stats_db_connection.execute(delete_all_stats)
+# stats_db_connection.commit()
+# print get_stats('ZYZZ', datetime.datetime(2018,1,1), 10)
+# TODO each
