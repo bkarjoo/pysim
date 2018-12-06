@@ -9,7 +9,7 @@ import sqlite3
 
 def log_on():
     login = "http://api.kibot.com/?action=login&user={}&password={}".format(
-        config.kibot_user_name, config.kibot_pass_word)
+        config.data_source_username, config.data_source_password)
     r = requests.get(login)
     if r.text[:3] == '200' or r.text[:3] == '407':
         return True

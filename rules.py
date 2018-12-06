@@ -76,24 +76,24 @@ def clean_list(symbol_list):
 
 
 # the symbols to trade on any given date
-def basket(dt = None):
+def basket(date_time):
     # to determine if there's a trade the zscore of the symbol on that date must be > 1
-    z_score_greater_than_1 = clean_list(twitter_sentiment_zscore(dt, 1, True))
-    z_score_less_than_neg1 = clean_list(twitter_sentiment_zscore(dt, -1, False))
-    earnings_symbols = clean_list(earnings_basket(dt))
+    z_score_greater_than_1 = clean_list(twitter_sentiment_zscore(date_time, 1, True))
+    z_score_less_than_neg1 = clean_list(twitter_sentiment_zscore(date_time, -1, False))
+    earnings_symbols = clean_list(earnings_basket(date_time))
     # remove earnings from baskets
     global potential_longs
     global potential_shorts
     potential_longs = list(set(z_score_greater_than_1) - set(earnings_symbols))
     filtered = []
     for symbol in potential_longs:
-        stats = eod.get_stats(symbol, dt, 20)
+        stats = eod.get_stats(symbol, date_time, 20)
         if stats.adr > 1: filtered.append(symbol)
     potential_longs = filtered[:]
     potential_shorts = list(set(z_score_less_than_neg1) - set(earnings_symbols))
     filtered = []
     for symbol in potential_shorts:
-        stats = eod.get_stats(symbol, dt, 20)
+        stats = eod.get_stats(symbol, date_time, 20)
         if stats.adr > 1: filtered.append(symbol)
         potential_shorts = filtered[:]
     return potential_longs + potential_shorts

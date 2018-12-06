@@ -39,6 +39,14 @@ def get_position(symbol):
     return 0 if t is None else t.position()
 
 
+def has_position(symbol):
+    return get_position(symbol) != 0
+
+
+def close_position(symbol):
+    # TODO implement
+    pass
+
 # will average the volume of the number of days ending on the trading day before request date
 # def adv(symbol, number_of_days, request_date):
 #     return eod.average_daily_range(symbol, number_of_days, request_date)

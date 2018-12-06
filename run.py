@@ -7,6 +7,7 @@ import numpy as np
 import pickle
 import time
 import data_utilities.minute as intraday
+import matplotlib as plt
 
 
 # TODO move this to time utilities
