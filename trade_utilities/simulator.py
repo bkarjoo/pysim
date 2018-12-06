@@ -50,15 +50,15 @@ def is_fill(o, row):
 
 
 def check_fills(row):
-    orders = done_away_orders.get_open_orders(row['symbol'])
-    if orders is not None:
-        for o in orders[:]:
-            fill_price = o.price
-            day_return.add_transaction(o.qty, fill_price)
-            e = Execution(o.qty, o.symbol, fill_price, row.name)
-            executions.append(e)
-            trades.add_execution(e)
-            orders.remove(o)
+
+    while done_away_orders.has_order():
+        o = done_away_orders.pop_order()
+        day_return.add_transaction(o.qty, o.price)
+        e = Execution(o.qty, o.symbol, o.price, row.name)
+        executions.append(e)
+        trades.add_execution(e)
+
+
 
     orders = open_orders.get_open_orders(row['symbol'])
     if orders is not None:
@@ -69,14 +69,9 @@ def check_fills(row):
 
 
 def check_donaways_eod(date_i):
-    for symbol in done_away_orders.keys():
-        orders = done_away_orders.get_open_orders(symbol)
-        for o in orders[:]:
-            fill_price = o.price
-            day_return.add_transaction(o.qty, fill_price)
-            e = Execution(o.qty, o.symbol, fill_price, date_i + datetime.timedelta(hours=16))
-            executions.append(e)
-            trades.add_execution(e)
-            orders.remove(o)
-
-
+    while done_away_orders.has_order():
+        o = done_away_orders.pop_order()
+        day_return.add_transaction(o.qty, o.price)
+        e = Execution(o.qty, o.symbol, o.price, date_i)
+        executions.append(e)
+        trades.add_execution(e)

@@ -33,18 +33,19 @@ def done_away(qty, symbol, price):
     done_away_orders.append(o)
 
 
+
 def get_position(symbol):
     t = trades.get_open_trade(symbol)
     return 0 if t is None else t.position()
 
 
 # will average the volume of the number of days ending on the trading day before request date
-def adv(symbol, number_of_days, request_date):
-    return eod.average_daily_range(symbol, number_of_days, request_date)
-
-
-def adr(symbol, number_of_days, request_date):
-    return eod.average_daily_range(symbol, number_of_days, request_date)
-
-
-print adr('AAPL', 90, datetime.datetime(2018, 1, 2))
+# def adv(symbol, number_of_days, request_date):
+#     return eod.average_daily_range(symbol, number_of_days, request_date)
+#
+#
+# def adr(symbol, number_of_days, request_date):
+#     return eod.average_daily_range(symbol, number_of_days, request_date)
+#
+#
+# print adr('AAPL', 90, datetime.datetime(2018, 1, 2))

@@ -7,3 +7,6 @@ class Executions(object):
 
     def shares_traded(self):
         return sum([abs(item.qty) for item in self.executions])
+
+    def __len__(self):
+        return len(self.executions)

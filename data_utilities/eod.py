@@ -6,6 +6,20 @@ import kibot.kibot_downloader as kb
 import pandas as pd
 import datetime
 
+
+class EODStats(object):
+    def __init__(self, stats_tup):
+        self.adr = stats_tup[4]
+        self.adv = stats_tup[3]
+        self.symbol = stats_tup[1]
+        self.date = stats_tup[0]
+        self.lookback = stats_tup[2]
+
+    def __str__(self):
+        return '{},{},look_back={},adv={},adr={}'.format(
+            self.date, self.symbol, self.lookback, self.adv, self.adr
+        )
+
 # scripts
 create_eod_table_script = """
 CREATE TABLE IF NOT EXISTS eod
@@ -53,7 +67,7 @@ AND bar_date >= ?
 AND bar_date <= ?
 """
 
-select_stats_script = """
+select_stats_query = """
 SELECT * FROM stats
 WHERE symbol = ?
 AND bar_date = ?
@@ -81,7 +95,7 @@ delete_script = """
 DELETE FROM eod WHERE symbol = ?
 """
 
-delete_all_stats = """
+delete_all_stats_script = """
 DELETE FROM stats
 """
 
@@ -264,10 +278,15 @@ def request_eod_data(symbol, number_of_days, request_date):
     return select_eod_rows(symbol, first_request_date, last_request_date)
 
 
-def get_stats(symbol, date, lookback):
+def request_stats_from_db(symbol, date, lookback):
     cur = stats_db_connection.cursor()
-    response = cur.execute(select_stats_script, (symbol, str(date.date()), lookback))
-    return response.fetchall()
+    response = cur.execute(select_stats_query, (symbol, str(date.date()), lookback))
+    row = response.fetchone()
+    if row is None:
+        return None
+    else:
+        return EODStats(row)
+
 
 
 def average_daily_range(symbol, look_back, date):
@@ -291,6 +310,19 @@ def get_db_row_count():
     return results.fetchone()[0]
 
 
+
+def generate_stats(symbol, look_back, date):
+    try:
+        df = get_eod_bars(symbol, look_back, date)
+        df['range'] = df['high'] - df['low']
+        adr = df['range'].mean()
+        adv = df['volume'].mean()
+        return EODStats((date.date(),symbol,look_back,adv,adr))
+    except:
+        print 'data not available for ', symbol, look_back, date
+        return None
+
+
 # returns days_back number of bars from the request date
 # not including request date
 def get_eod_bars(symbol, days_back, request_date):
@@ -311,9 +343,25 @@ def get_eod_bars(symbol, days_back, request_date):
             raise LookupError('Data not available.')
 
 
+def get_stats(symbol, date, lookback):
+    response = request_stats_from_db(symbol, date, lookback)
+    if response is None:
+        stats = generate_stats(symbol, lookback, date)
+        if stats is None: return None
+        insert_stats(date, symbol, lookback, stats.adv, stats.adr)
+        return stats
+    else:
+        return response
+
+
 # print get_eod_bars('TJX', 1, datetime.datetime(2017,7,17))
 # insert_stats(datetime.datetime(2018,1,1), 'ZYZZ', 10, 2.2, 1.3)
-# stats_db_connection.execute(delete_all_stats)
+# stats_db_connection.execute(delete_all_stats_script)
 # stats_db_connection.commit()
-# print get_stats('ZYZZ', datetime.datetime(2018,1,1), 10)
-# TODO each
+# print request_stats_from_db('ZYZZ', datetime.datetime(2018, 1, 1), 10)
+# print get_stats('AAPL', datetime.datetime(2018, 1, 2), 10)
+# print get_stats('GE', datetime.datetime(2018, 1, 2), 10)
+# print get_stats('BAC', datetime.datetime(2018, 1, 2), 10)
+# print get_stats('C', datetime.datetime(2018, 1, 2), 10)
+# print get_stats('PRGO', datetime.datetime(2018, 1, 2), 10)
+# print get_stats('PEP', datetime.datetime(2018, 1, 2), 10)

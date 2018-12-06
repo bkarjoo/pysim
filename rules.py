@@ -5,7 +5,7 @@ import sqlite3
 import math
 import pickle
 from trade_utilities.bar_dictionary import BarDictionary
-from data_utilities.eod import *
+import data_utilities.eod as eod
 
 strategy_name = 'twitter sentiment'
 commission_per_share = 0.007
@@ -15,6 +15,7 @@ previous_date = datetime.datetime(2017, 7, 12)
 todays_date = datetime.datetime(2017, 7, 13)
 break_out_of_loop = False # set to true if no longer positions are possible
 reset_after_opening = False # get a reduced basket for just the filled positions at 9:30
+use_intraday = False
 
 today_basket = []
 
@@ -86,12 +87,14 @@ def basket(dt = None):
     potential_longs = list(set(z_score_greater_than_1) - set(earnings_symbols))
     filtered = []
     for symbol in potential_longs:
-        if adr(symbol, 20, dt) > 1: filtered.append(symbol)
+        stats = eod.get_stats(symbol, dt, 20)
+        if stats.adr > 1: filtered.append(symbol)
     potential_longs = filtered[:]
     potential_shorts = list(set(z_score_less_than_neg1) - set(earnings_symbols))
     filtered = []
     for symbol in potential_shorts:
-        if adr(symbol, 20, dt) > 1: filtered.append(symbol)
+        stats = eod.get_stats(symbol, dt, 20)
+        if stats.adr > 1: filtered.append(symbol)
         potential_shorts = filtered[:]
     return potential_longs + potential_shorts
 
@@ -126,16 +129,17 @@ def on_new_day(date):
 
 # called every minute before new data arrives and even if no new data arrives for that minute
 def on_new_minute(date_time):
+    global break_out_of_loop
     # print date_time.time() == datetime.time(9, 28)
     if date_time.time() == datetime.time(9, 28):
         for symbol in potential_longs:
             if bars.has_data_today(symbol, date_time):
                 try:
                     # eod = bloomberg_eod[symbol]
-                    eod = get_eod_bars(symbol, 10, date_time)
+                    eod_bar = eod.get_eod_bars(symbol, 10, date_time)
 
-                    close_price = eod[previous_date.date():previous_date.date()]['close'][0]
-                    open_price = eod[todays_date.date():todays_date.date()]['open'][0]
+                    close_price = eod_bar[previous_date.date():previous_date.date()]['close'][0]
+                    open_price = eod_bar[todays_date.date():todays_date.date()]['open'][0]
                     if math.isnan(open_price): continue
                     pre_market_last = bars.get_close_price(symbol)
 
@@ -153,9 +157,9 @@ def on_new_minute(date_time):
             else:
                 try:
                     # eod = bloomberg_eod[symbol]
-                    eod = get_eod_bars(symbol, 10, date_time)
+                    eod_bar = eod.get_eod_bars(symbol, 10, date_time)
 
-                    open_price = eod[todays_date.date():todays_date.date()]['open'][0]
+                    open_price = eod_bar[todays_date.date():todays_date.date()]['open'][0]
                     if math.isnan(open_price): continue
                     done_away(round(10000 / open_price, 0), symbol, open_price)
                 except Exception as e:
@@ -166,10 +170,10 @@ def on_new_minute(date_time):
             if bars.has_data_today(symbol, date_time):
                 try:
                     # eod = bloomberg_eod[symbol]
-                    eod = get_eod_bars(symbol, 10, date_time)
+                    eod_bar = eod.get_eod_bars(symbol, 10, date_time)
 
-                    close_price = eod[previous_date.date():previous_date.date()]['close'][0]
-                    open_price = eod[todays_date.date():todays_date.date()]['open'][0]
+                    close_price = eod_bar[previous_date.date():previous_date.date()]['close'][0]
+                    open_price = eod_bar[todays_date.date():todays_date.date()]['open'][0]
                     if math.isnan(open_price): continue
                     pre_market_last = bars.get_close_price(symbol)
 
@@ -187,45 +191,49 @@ def on_new_minute(date_time):
             else:
                 try:
                     # eod = bloomberg_eod[symbol]
-                    eod = get_eod_bars(symbol, 10, date_time)
+                    eod_bar = eod.get_eod_bars(symbol, 10, date_time)
 
-                    open_price = eod[todays_date.date():todays_date.date()]['open'][0]
+                    open_price = eod_bar[todays_date.date():todays_date.date()]['open'][0]
                     if math.isnan(open_price): continue
                     done_away(round(-10000 / open_price, 0), symbol, open_price)
                 except Exception as e:
                     print 'ERROR', e.message
                     pass
-
+    elif date_time.time() == datetime.time(9, 30):
+        break_out_of_loop = True
     # elif date_time.time() == datetime.time(9, 30):
     #     global break_out_of_loop
     #     break_out_of_loop = True
 
 
 def on_new_bar(date_time, symbol, open_price, high_price, low_price, close_price, volume):
-
+    global reset_after_opening
     if date_time.time() <= datetime.time(9, 28):
         bars.add_row(symbol, date_time, open_price, high_price, low_price, close_price, volume)
 
-    if date_time.time() == datetime.time(9,35):
-        if trades.has_position(symbol):
 
-            trade = trades.get_open_trade(symbol)
-            ep = trade.average_entry_price()
-            if trade.side == 'Long':
-
-                sell(abs(trade.position()), symbol, ep * 1.01)
-            elif trade.side == 'Short':
-
-                buy(abs(trade.position()), symbol, ep * .99)
+    # if date_time.time() == datetime.time(9,35):
+    #     if trades.has_position(symbol):
+    #
+    #         trade = trades.get_open_trade(symbol)
+    #         ep = trade.average_entry_price()
+    #         if trade.side == 'Long':
+    #
+    #             sell(abs(trade.position()), symbol, ep * 1.01)
+    #         elif trade.side == 'Short':
+    #
+    #             buy(abs(trade.position()), symbol, ep * .99)
 
 
 def on_day_end():
+
     for symbol, pos in trades.get_open_position_list():
         # eod = bloomberg_eod[symbol]
-        eod = get_eod_bars(symbol, 10, todays_date)
+        eod_bar = eod.get_eod_bars(symbol, 10, todays_date)
 
-        close_price = eod[todays_date.date():todays_date.date()]['close'][0]
+        close_price = eod_bar[todays_date.date():todays_date.date()]['close'][0]
         done_away(pos * -1, symbol, close_price)
+
     global previous_date
     previous_date = todays_date
 

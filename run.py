@@ -100,7 +100,7 @@ while date_i <= end_dt:
     # -------------------------------------------------------------------
 
     open_orders.reset()
-    check_donaways_eod(date_i)
+    check_donaways_eod(time_tracker)
 
     #print trades.get_open_position_list()
     day_return.close_positions(trades.get_open_position_list())
