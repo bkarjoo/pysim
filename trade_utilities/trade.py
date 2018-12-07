@@ -7,8 +7,12 @@ class Trade(object):
         self.last_price = 0.0
         # update max_exposure on execution and last_price
         self.exposure = 0.0
+        self.open_date = None
+        self.close_date = None
 
     def add_execution(self, execution):
+        if self.open_date is None:
+            self.open_date = execution.date_time
         if self.symbol == '':
             self.symbol = execution.symbol
         if self.side is None:
@@ -25,6 +29,7 @@ class Trade(object):
         self.executions.append(execution)
         self.update_last_price(execution.price)
         if self.position() == 0:
+            self.close_date = execution.date_time
             self.is_closed = True
 
     def position(self):
@@ -65,7 +70,23 @@ class Trade(object):
                 return 0
         return total_value / float(total_qty)
 
+    def average_exit_price(self):
+        total_qty = 0
+        total_value = 0
+        for e in self.executions:
+            if self.side == 'Long':
+                if e.qty < 0:
+                    total_qty += e.qty
+                    total_value += e.qty * e.price
+            elif self.side == 'Short':
+                if e.qty > 0:
+                    total_qty += e.qty
+                    total_value += e.qty * e.price
+            else:
+                return 0
+        return total_value / float(total_qty)
 
     def __str__(self):
-        s = '{} {} {}.'.format(self.side, abs(self.position()), self.symbol)
+        s = '{},{},{},{},{},{},{}'.format(self.open_date, self.side, self.shares_traded(), self.symbol,
+                                          self.average_entry_price(), self.average_exit_price(), self.pnl())
         return s

@@ -131,3 +131,11 @@ class Trades(object):
     def get_open_position_list(self):
         return [(x.symbol, x.position()) for x in self.open_trades]
 
+    def __str__(self):
+        s = ''
+        for trade in self.closed_trades:
+            s += '{}\n'.format(str(trade))
+        for trade in self.open_trades:
+            s += '{}\n'.format(str(trade))
+        return s
+

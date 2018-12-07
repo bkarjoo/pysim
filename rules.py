@@ -10,7 +10,8 @@ import data_utilities.eod as eod
 strategy_name = 'twitter sentiment'
 commission_per_share = 0.007
 start_date = '2017-07-13'
-end_date = '2018-06-13'
+end_date = '2017-07-13'
+#end_date = '2018-06-13'
 previous_date = datetime.datetime(2017, 7, 12)
 todays_date = datetime.datetime(2017, 7, 13)
 break_out_of_loop = False # set to true if no longer positions are possible
