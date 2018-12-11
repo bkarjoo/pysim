@@ -6,12 +6,27 @@ import math
 import pickle
 from trade_utilities.bar_dictionary import BarDictionary
 import data_utilities.eod as eod
+import pandas as pd
 
+
+"""
+Rules: 
+
+Basket
+------
+stock doesn't have earnings ACBO
+stock doesn't have earnings previous day ACBO
+20 day ADR > 1
+if twitter z-score > 1 buy if trading up but not up more than 1% of previous close 
+if twitter z-score < -1 short if trading down but not down more than 1% of previous close
+
+exit moc
+"""
 strategy_name = 'twitter sentiment'
 commission_per_share = 0.007
 start_date = '2017-07-13'
-end_date = '2017-07-13'
-#end_date = '2018-06-13'
+#end_date = '2017-07-13'
+end_date = '2018-06-13'
 previous_date = datetime.datetime(2017, 7, 12)
 todays_date = datetime.datetime(2017, 7, 13)
 break_out_of_loop = False # set to true if no longer positions are possible
@@ -19,6 +34,8 @@ reset_after_opening = False # get a reduced basket for just the filled positions
 use_intraday = False
 
 today_basket = []
+earnings_symbols = []
+mna_dnt = []
 
 # Custom Data
 earnings_db_path = '{}/custom/earning.db'.format(config.data_root)
@@ -31,6 +48,7 @@ potential_shorts = None
 
 bars = BarDictionary()
 bloomberg_eod = None
+mna_exclude = []
 
 
 def reset_reset_after_opening():
@@ -78,20 +96,26 @@ def clean_list(symbol_list):
 
 # the symbols to trade on any given date
 def basket(date_time):
+    global mna_exclude
+    mna_exclude = mna_exclude + mna_dnt[date_time.date():date_time.date()][0].tolist()
+    print mna_exclude
+    if date_time.date() == datetime.date(2018, 2, 14): return []
     # to determine if there's a trade the zscore of the symbol on that date must be > 1
     z_score_greater_than_1 = clean_list(twitter_sentiment_zscore(date_time, 1, True))
     z_score_less_than_neg1 = clean_list(twitter_sentiment_zscore(date_time, -1, False))
+    global earnings_symbols
+    previous_day_earnings_basket = earnings_symbols
     earnings_symbols = clean_list(earnings_basket(date_time))
     # remove earnings from baskets
     global potential_longs
     global potential_shorts
-    potential_longs = list(set(z_score_greater_than_1) - set(earnings_symbols))
+    potential_longs = list(set(z_score_greater_than_1) - set(earnings_symbols) - set(previous_day_earnings_basket) - set(mna_exclude))
     filtered = []
     for symbol in potential_longs:
         stats = eod.get_stats(symbol, date_time, 20)
         if stats.adr > 1: filtered.append(symbol)
     potential_longs = filtered[:]
-    potential_shorts = list(set(z_score_less_than_neg1) - set(earnings_symbols))
+    potential_shorts = list(set(z_score_less_than_neg1) - set(earnings_symbols) - set(previous_day_earnings_basket) - set(mna_exclude))
     filtered = []
     for symbol in potential_shorts:
         stats = eod.get_stats(symbol, date_time, 20)
@@ -114,6 +138,16 @@ def on_run_start():
     f.close()
     global reset_after_opening
     reset_after_opening = False
+    global mna_dnt
+    mna_dnt = pd.read_csv('{}/custom/mna.csv'.format(config.data_root), header=None)
+    mna_dnt[1] = pd.to_datetime(mna_dnt[1])
+    mna_dnt.set_index(1, inplace=True)
+    print mna_dnt[datetime.date(2018,11,26):datetime.date(2018,11,26)][0].tolist()
+    print mna_dnt.head()
+    global mna_exclude
+    mna_exclude = mna_dnt['2015-01-01':start_date][0].tolist()
+
+
 
 
 def on_new_day(date):
@@ -144,28 +178,29 @@ def on_new_minute(date_time):
                     if math.isnan(open_price): continue
                     pre_market_last = bars.get_close_price(symbol)
 
-                    # if pre_market_last > close_price:
-                    #     if pre_market_last > close_price * 1.01:
-                    #         pass
-                    #     else:
-                    #         #print round(10000/pre_market_last, 0), symbol, open_price
-                    #         done_away(round(10000/pre_market_last, 0), symbol, open_price)
+                    if pre_market_last > close_price:
+                        if pre_market_last > close_price * 1.01:
+                            pass
+                        else:
+                            #print round(10000/pre_market_last, 0), symbol, open_price
+                            done_away(round(10000/pre_market_last, 0), symbol, open_price)
 
-                    done_away(round(10000 / pre_market_last, 0), symbol, open_price)
+                    #done_away(round(10000 / pre_market_last, 0), symbol, open_price)
                 except Exception as e:
                     print 'ERROR', e.message
                     pass
             else:
-                try:
-                    # eod = bloomberg_eod[symbol]
-                    eod_bar = eod.get_eod_bars(symbol, 10, date_time)
-
-                    open_price = eod_bar[todays_date.date():todays_date.date()]['open'][0]
-                    if math.isnan(open_price): continue
-                    done_away(round(10000 / open_price, 0), symbol, open_price)
-                except Exception as e:
-                    print 'ERROR', e.message
-                    pass
+                pass
+                # try:
+                #     # eod = bloomberg_eod[symbol]
+                #     eod_bar = eod.get_eod_bars(symbol, 10, date_time)
+                #
+                #     open_price = eod_bar[todays_date.date():todays_date.date()]['open'][0]
+                #     if math.isnan(open_price): continue
+                #     done_away(round(10000 / open_price, 0), symbol, open_price)
+                # except Exception as e:
+                #     print 'ERROR', e.message
+                #     pass
 
         for symbol in potential_shorts:
             if bars.has_data_today(symbol, date_time):
@@ -178,28 +213,29 @@ def on_new_minute(date_time):
                     if math.isnan(open_price): continue
                     pre_market_last = bars.get_close_price(symbol)
 
-                    # if pre_market_last < close_price:
-                    #     if pre_market_last < close_price * .99:
-                    #         pass
-                    #     else:
-                    #         done_away(round(-10000/pre_market_last, 0), symbol, open_price)
-                    #         #print round(-10000/pre_market_last, 0), symbol, open_price
+                    if pre_market_last < close_price:
+                        if pre_market_last < close_price * .99:
+                            pass
+                        else:
+                            done_away(round(-10000/pre_market_last, 0), symbol, open_price)
+                            #print round(-10000/pre_market_last, 0), symbol, open_price
 
-                    done_away(round(-10000 / pre_market_last, 0), symbol, open_price)
+                    # done_away(round(-10000 / pre_market_last, 0), symbol, open_price)
                 except Exception as e:
                     print 'ERROR', e.message
                     pass
             else:
-                try:
-                    # eod = bloomberg_eod[symbol]
-                    eod_bar = eod.get_eod_bars(symbol, 10, date_time)
-
-                    open_price = eod_bar[todays_date.date():todays_date.date()]['open'][0]
-                    if math.isnan(open_price): continue
-                    done_away(round(-10000 / open_price, 0), symbol, open_price)
-                except Exception as e:
-                    print 'ERROR', e.message
-                    pass
+                pass
+                # try:
+                #     # eod = bloomberg_eod[symbol]
+                #     eod_bar = eod.get_eod_bars(symbol, 10, date_time)
+                #
+                #     open_price = eod_bar[todays_date.date():todays_date.date()]['open'][0]
+                #     if math.isnan(open_price): continue
+                #     done_away(round(-10000 / open_price, 0), symbol, open_price)
+                # except Exception as e:
+                #     print 'ERROR', e.message
+                #     pass
     elif date_time.time() == datetime.time(9, 30):
         break_out_of_loop = True
     # elif date_time.time() == datetime.time(9, 30):
